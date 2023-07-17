@@ -1,0 +1,27 @@
+DELIMITER //
+
+use test;
+-- Step 1: renew_logs 테이블과 트리거 생성
+CREATE TABLE renew_logs (
+  log_id INT AUTO_INCREMENT PRIMARY KEY,
+  log_data JSON,
+  log_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER users_renew_trigger
+AFTER INSERT ON users
+FOR EACH ROW
+BEGIN
+  INSERT INTO renew_logs (log_data) VALUES (JSON_OBJECT('id', NEW.id, 'name', NEW.name, 'email', NEW.email));
+END//
+
+-- Step 2: renew.json 파일 생성
+SET @sql := CONCAT("SELECT CONCAT('[', GROUP_CONCAT(log_data SEPARATOR ','), ']') INTO OUTFILE 's3://dev-s3-bucket-reca3/renew.json' FROM renew_logs");
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Step 3: renew_logs 테이블 데이터 초기화
+TRUNCATE TABLE renew_logs;
+
+DELIMITER ;
